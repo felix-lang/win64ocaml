@@ -1,20 +1,22 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                     *)
-(*  Copyright 1996 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../../LICENSE.  *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Regular expressions and high-level string processing *)
 
 
-(** {6 Regular expressions} *)
+(** {1 Regular expressions} *)
 
 
 type regexp
@@ -36,10 +38,10 @@ val regexp : string -> regexp
               To include a [\]] character in a set, make it the first
               character of the set. To include a [-] character in a set,
               make it the first or the last character of the set.
-   - [^     ] Matches at beginning of line (either at the beginning of
-              the matched string, or just after a newline character).
-   - [$     ] Matches at end of line (either at the end of the matched
-              string, or just before a newline character).
+   - [^     ] Matches at beginning of line: either at the beginning of
+              the matched string, or just after a '\n' character.
+   - [$     ] Matches at end of line: either at the end of the matched
+              string, or just before a '\n' character.
    - [\|    ] (infix) Alternative between two expressions.
    - [\(..\)] Grouping and naming of the enclosed expression.
    - [\1    ] The text matched by the first [\(...\)] expression
@@ -82,7 +84,7 @@ val regexp_string_case_fold : string -> regexp
    but the regexp matches in a case-insensitive way. *)
 
 
-(** {6 String matching and searching} *)
+(** {1 String matching and searching} *)
 
 
 val string_match : regexp -> string -> int -> bool
@@ -186,7 +188,7 @@ val group_end : int -> int
    the regular expression. *)
 
 
-(** {6 Replacement} *)
+(** {1 Replacement} *)
 
 
 val global_replace : regexp -> string -> string -> string
@@ -222,7 +224,7 @@ val replace_matched : string -> string -> string
    searching function. *)
 
 
-(** {6 Splitting} *)
+(** {1 Splitting} *)
 
 
 val split : regexp -> string -> string list
@@ -268,7 +270,7 @@ val bounded_full_split : regexp -> string -> int -> split_result list
    the latter are tagged [Text]. *)
 
 
-(** {6 Extracting substrings} *)
+(** {1 Extracting substrings} *)
 
 
 val string_before : string -> int -> string

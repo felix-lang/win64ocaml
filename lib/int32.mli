@@ -1,15 +1,17 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                     *)
-(*  Copyright 1996 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../LICENSE.     *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** 32-bit integers.
 
@@ -82,7 +84,7 @@ external logxor : int32 -> int32 -> int32 = "%int32_xor"
 (** Bitwise logical exclusive or. *)
 
 val lognot : int32 -> int32
-(** Bitwise logical negation *)
+(** Bitwise logical negation. *)
 
 external shift_left : int32 -> int -> int32 = "%int32_lsl"
 (** [Int32.shift_left x y] shifts [x] to the left by [y] bits.
@@ -111,35 +113,56 @@ external to_int : int32 -> int = "%int32_to_int"
    during the conversion.  On 64-bit platforms, the conversion
    is exact. *)
 
-external of_float : float -> int32 = "caml_int32_of_float"
+external of_float : float -> int32
+  = "caml_int32_of_float" "caml_int32_of_float_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Convert the given floating-point number to a 32-bit integer,
    discarding the fractional part (truncate towards 0).
    The result of the conversion is undefined if, after truncation,
    the number is outside the range \[{!Int32.min_int}, {!Int32.max_int}\]. *)
 
-external to_float : int32 -> float = "caml_int32_to_float"
+external to_float : int32 -> float
+  = "caml_int32_to_float" "caml_int32_to_float_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Convert the given 32-bit integer to a floating-point number. *)
 
 external of_string : string -> int32 = "caml_int32_of_string"
 (** Convert the given string to a 32-bit integer.
-   The string is read in decimal (by default) or in hexadecimal,
-   octal or binary if the string begins with [0x], [0o] or [0b]
-   respectively.
-   Raise [Failure "int_of_string"] if the given string is not
+   The string is read in decimal (by default, or if the string 
+   begins with [0u]) or in hexadecimal, octal or binary if the
+   string begins with [0x], [0o] or [0b] respectively.
+
+   The [0u] prefix reads the input as an unsigned integer in the range
+   [[0, 2*Int32.max_int+1]].  If the input exceeds {!Int32.max_int}
+   it is converted to the signed integer
+   [Int32.min_int + input - Int32.max_int - 1].
+
+   The [_] (underscore) character can appear anywhere in the string
+   and is ignored.
+   Raise [Failure "Int32.of_string"] if the given string is not
    a valid representation of an integer, or if the integer represented
    exceeds the range of integers representable in type [int32]. *)
+
+val of_string_opt: string -> int32 option
+(** Same as [of_string], but return [None] instead of raising.
+    @since 4.05 *)
+
 
 val to_string : int32 -> string
 (** Return the string representation of its argument, in signed decimal. *)
 
-external bits_of_float : float -> int32 = "caml_int32_bits_of_float"
+external bits_of_float : float -> int32
+  = "caml_int32_bits_of_float" "caml_int32_bits_of_float_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Return the internal representation of the given float according
    to the IEEE 754 floating-point 'single format' bit layout.
    Bit 31 of the result represents the sign of the float;
    bits 30 to 23 represent the (biased) exponent; bits 22 to 0
    represent the mantissa. *)
 
-external float_of_bits : int32 -> float = "caml_int32_float_of_bits"
+external float_of_bits : int32 -> float
+  = "caml_int32_float_of_bits" "caml_int32_float_of_bits_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Return the floating-point number whose internal representation,
    according to the IEEE 754 floating-point 'single format' bit layout,
    is the given [int32]. *)
@@ -153,9 +176,13 @@ val compare: t -> t -> int
     allows the module [Int32] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 
+val equal: t -> t -> bool
+(** The equal function for int32s.
+    @since 4.03.0 *)
+
 (**/**)
 
-(** {6 Deprecated functions} *)
+(** {1 Deprecated functions} *)
 
 external format : string -> int32 -> string = "caml_int32_format"
 (** Do not use this deprecated function.  Instead,

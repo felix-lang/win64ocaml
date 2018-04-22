@@ -1,24 +1,26 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                     *)
-(*  Copyright 1996 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../../LICENSE.  *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Interface to the Unix system.
 
-    Note: all the functions of this module (except [error_message] and
-    [handle_unix_error]) are liable to raise the [Unix_error]
+    Note: all the functions of this module (except {!error_message} and
+    {!handle_unix_error}) are liable to raise the {!Unix_error}
     exception whenever the underlying system call signals an error. *)
 
 
-(** {6 Error report} *)
+(** {1 Error report} *)
 
 
 type error =
@@ -110,21 +112,48 @@ val error_message : error -> string
 
 val handle_unix_error : ('a -> 'b) -> 'a -> 'b
 (** [handle_unix_error f x] applies [f] to [x] and returns the result.
-   If the exception [Unix_error] is raised, it prints a message
+   If the exception {!Unix_error} is raised, it prints a message
    describing the error and exits with code 2. *)
 
 
-(** {6 Access to the process environment} *)
+(** {1 Access to the process environment} *)
 
 
 val environment : unit -> string array
 (** Return the process environment, as an array of strings
-    with the format ``variable=value''. *)
+    with the format ``variable=value''.  The returned array
+    is empty if the process has special privileges. *)
+
+val unsafe_environment : unit -> string array
+(** Return the process environment, as an array of strings with the
+    format ``variable=value''.  Unlike {!environment}, this function
+    returns a populated array even if the process has special
+    privileges.  See the documentation for {!unsafe_getenv} for more
+    details.
+
+    @since 4.06.0 *)
 
 val getenv : string -> string
 (** Return the value associated to a variable in the process
-   environment. Raise [Not_found] if the variable is unbound.
-   (This function is identical to {!Sys.getenv}.) *)
+   environment, unless the process has special privileges.
+   @raise Not_found if the variable is unbound or the process has
+   special privileges.
+
+   (This function is identical to {!Sys.getenv}. *)
+
+val unsafe_getenv : string -> string
+(** Return the value associated to a variable in the process
+   environment.
+
+   Unlike {!getenv}, this function returns the value even if the
+   process has special privileges. It is considered unsafe because the
+   programmer of a setuid or setgid program must be careful to avoid
+   using maliciously crafted environment variables in the search path
+   for executables, the locations for temporary files or logs, and the
+   like.
+
+   @raise Not_found if the variable is unbound.
+   @since 4.06.0  *)
 
 val putenv : string -> string -> unit
 (** [Unix.putenv name value] sets the value associated to a
@@ -133,7 +162,7 @@ val putenv : string -> string -> unit
    and [value] its new associated value. *)
 
 
-(** {6 Process handling} *)
+(** {1 Process handling} *)
 
 
 type process_status =
@@ -152,17 +181,17 @@ type process_status =
 
 
 type wait_flag =
-    WNOHANG (** do not block if no child has
+    WNOHANG (** Do not block if no child has
                died yet, but immediately return with a pid equal to 0.*)
-  | WUNTRACED (** report also the children that receive stop signals. *)
+  | WUNTRACED (** Report also the children that receive stop signals. *)
 (** Flags for {!Unix.waitpid}. *)
 
 val execv : string -> string array -> 'a
 (** [execv prog args] execute the program in file [prog], with
    the arguments [args], and the current process environment.
    These [execv*] functions never return: on success, the current
-   program is replaced by the new one;
-   on failure, a {!Unix.Unix_error} exception is raised. *)
+   program is replaced by the new one.
+   @raise Unix.Unix_error on failure. *)
 
 val execve : string -> string array -> string array -> 'a
 (** Same as {!Unix.execv}, except that the third argument provides the
@@ -178,11 +207,15 @@ val execvpe : string -> string array -> string array -> 'a
 
 val fork : unit -> int
 (** Fork a new process. The returned integer is 0 for the child
-   process, the pid of the child process for the parent process. *)
+   process, the pid of the child process for the parent process.
+
+   On Windows: not implemented, use {!create_process} or threads. *)
 
 val wait : unit -> int * process_status
 (** Wait until one of the children processes die, and return its pid
-   and termination status. *)
+   and termination status.
+
+   On Windows: Not implemented, use {!waitpid}. *)
 
 val waitpid : wait_flag list -> int -> int * process_status
 (** Same as {!Unix.wait}, but waits for the child process whose pid is given.
@@ -192,28 +225,35 @@ val waitpid : wait_flag list -> int -> int * process_status
    Negative pid arguments represent process groups.
    The list of options indicates whether [waitpid] should return
    immediately without waiting, and whether it should report stopped
-   children. *)
+   children.
+
+   On Windows, this function can only wait for a given PID, not any
+   child process. *)
 
 val system : string -> process_status
 (** Execute the given command, wait until it terminates, and return
    its termination status. The string is interpreted by the shell
-   [/bin/sh] and therefore can contain redirections, quotes, variables,
-   etc. The result [WEXITED 127] indicates that the shell couldn't
-   be executed. *)
+   [/bin/sh] (or the command interpreter [cmd.exe] on Windows) and
+   therefore can contain redirections, quotes, variables, etc. The
+   result [WEXITED 127] indicates that the shell couldn't be
+   executed. *)
 
 val getpid : unit -> int
 (** Return the pid of the process. *)
 
 val getppid : unit -> int
-(** Return the pid of the parent process. *)
+(** Return the pid of the parent process.
+   On Windows: not implemented (because it is meaningless). *)
 
 val nice : int -> int
 (** Change the process priority. The integer argument is added to the
    ``nice'' value. (Higher values of the ``nice'' value mean
-   lower priorities.) Return the new nice value. *)
+   lower priorities.) Return the new nice value.
+
+   On Windows: not implemented. *)
 
 
-(** {6 Basic file input/output} *)
+(** {1 Basic file input/output} *)
 
 
 type file_descr
@@ -247,7 +287,11 @@ type open_flag =
   | O_SHARE_DELETE              (** Windows only: allow the file to be deleted
                                    while still open *)
   | O_CLOEXEC                   (** Set the close-on-exec flag on the
-                                   descriptor returned by {!openfile} *)
+                                   descriptor returned by {!openfile}.
+                                   See {!set_close_on_exec} for more
+                                   information. *)
+  | O_KEEPEXEC                  (** Clear the close-on-exec flag.
+                                    This is currently the default. *)
 (** The flags to {!Unix.openfile}. *)
 
 
@@ -282,25 +326,52 @@ val single_write : file_descr -> bytes -> int -> int -> int
 
 val write_substring : file_descr -> string -> int -> int -> int
 (** Same as [write], but take the data from a string instead of a byte
-    sequence. *)
+    sequence.
+    @since 4.02.0 *)
 
 val single_write_substring : file_descr -> string -> int -> int -> int
 (** Same as [single_write], but take the data from a string instead of
-    a byte sequence. *)
+    a byte sequence.
+    @since 4.02.0 *)
 
-(** {6 Interfacing with the standard input/output library} *)
+(** {1 Interfacing with the standard input/output library} *)
 
 
 
 val in_channel_of_descr : file_descr -> in_channel
 (** Create an input channel reading from the given descriptor.
    The channel is initially in binary mode; use
-   [set_binary_mode_in ic false] if text mode is desired. *)
+   [set_binary_mode_in ic false] if text mode is desired.
+   Text mode is supported only if the descriptor refers to a file
+   or pipe, but is not supported if it refers to a socket.
+   On Windows, [set_binary_mode_in] always fails on channels created
+   with this function.
+
+   Beware that channels are buffered so more characters may have been
+   read from the file descriptor than those accessed using channel functions.
+   Channels also keep a copy of the current position in the file.
+
+   You need to explicitly close all channels created with this function.
+   Closing the channel also closes the underlying file descriptor (unless
+   it was already closed). *)
 
 val out_channel_of_descr : file_descr -> out_channel
 (** Create an output channel writing on the given descriptor.
    The channel is initially in binary mode; use
-   [set_binary_mode_out oc false] if text mode is desired. *)
+   [set_binary_mode_out oc false] if text mode is desired.
+   Text mode is supported only if the descriptor refers to a file
+   or pipe, but is not supported if it refers to a socket.
+   On Windows, [set_binary_mode_out] always fails on channels created
+   with this function.
+
+   Beware that channels are buffered so you may have to [flush] them
+   to ensure that all data has been sent to the file descriptor.
+   Channels also keep a copy of the current position in the file.
+
+   You need to explicitly close all channels created with this function.
+   Closing the channel flushes the data and closes the underlying file
+   descriptor (unless it has already been closed, in which case the
+   buffered data is lost).*)
 
 val descr_of_in_channel : in_channel -> file_descr
 (** Return the descriptor corresponding to an input channel. *)
@@ -309,7 +380,7 @@ val descr_of_out_channel : out_channel -> file_descr
 (** Return the descriptor corresponding to an output channel. *)
 
 
-(** {6 Seeking and truncating} *)
+(** {1 Seeking and truncating} *)
 
 
 type seek_command =
@@ -324,14 +395,18 @@ val lseek : file_descr -> int -> seek_command -> int
     offset (from the beginning of the file). *)
 
 val truncate : string -> int -> unit
-(** Truncates the named file to the given size. *)
+(** Truncates the named file to the given size.
+
+  On Windows: not implemented. *)
 
 val ftruncate : file_descr -> int -> unit
 (** Truncates the file corresponding to the given descriptor
-   to the given size. *)
+   to the given size.
+
+  On Windows: not implemented. *)
 
 
-(** {6 File status} *)
+(** {1 File status} *)
 
 
 type file_kind =
@@ -374,13 +449,19 @@ val isatty : file_descr -> bool
 (** Return [true] if the given file descriptor refers to a terminal or
    console window, [false] otherwise. *)
 
-(** {6 File operations on large files} *)
+(** {1 File operations on large files} *)
 
 module LargeFile :
   sig
     val lseek : file_descr -> int64 -> seek_command -> int64
+    (** See {!Unix.lseek}. *)
+
     val truncate : string -> int64 -> unit
+    (** See {!Unix.truncate}. *)
+
     val ftruncate : file_descr -> int64 -> unit
+    (** See {!Unix.ftruncate}. *)
+
     type stats =
       { st_dev : int;               (** Device number *)
         st_ino : int;               (** Inode number *)
@@ -409,22 +490,86 @@ module LargeFile :
   regular integers (type [int]), thus allowing operating on files
   whose sizes are greater than [max_int]. *)
 
+(** {6 Mapping files into memory} *)
 
-(** {6 Operations on file names} *)
+val map_file :
+  file_descr -> ?pos:int64 -> ('a, 'b) CamlinternalBigarray.kind ->
+  'c CamlinternalBigarray.layout -> bool -> int array ->
+  ('a, 'b, 'c) CamlinternalBigarray.genarray
+(** Memory mapping of a file as a big array.
+  [map_file fd kind layout shared dims]
+  returns a big array of kind [kind], layout [layout],
+  and dimensions as specified in [dims].  The data contained in
+  this big array are the contents of the file referred to by
+  the file descriptor [fd] (as opened previously with
+  [Unix.openfile], for example).  The optional [pos] parameter
+  is the byte offset in the file of the data being mapped;
+  it defaults to 0 (map from the beginning of the file).
+
+  If [shared] is [true], all modifications performed on the array
+  are reflected in the file.  This requires that [fd] be opened
+  with write permissions.  If [shared] is [false], modifications
+  performed on the array are done in memory only, using
+  copy-on-write of the modified pages; the underlying file is not
+  affected.
+
+  [Genarray.map_file] is much more efficient than reading
+  the whole file in a big array, modifying that big array,
+  and writing it afterwards.
+
+  To adjust automatically the dimensions of the big array to
+  the actual size of the file, the major dimension (that is,
+  the first dimension for an array with C layout, and the last
+  dimension for an array with Fortran layout) can be given as
+  [-1].  [Genarray.map_file] then determines the major dimension
+  from the size of the file.  The file must contain an integral
+  number of sub-arrays as determined by the non-major dimensions,
+  otherwise [Failure] is raised.
+
+  If all dimensions of the big array are given, the file size is
+  matched against the size of the big array.  If the file is larger
+  than the big array, only the initial portion of the file is
+  mapped to the big array.  If the file is smaller than the big
+  array, the file is automatically grown to the size of the big array.
+  This requires write permissions on [fd].
+
+  Array accesses are bounds-checked, but the bounds are determined by
+  the initial call to [map_file]. Therefore, you should make sure no
+  other process modifies the mapped file while you're accessing it,
+  or a SIGBUS signal may be raised. This happens, for instance, if the
+  file is shrunk.
+
+  [Invalid_argument] or [Failure] may be raised in cases where argument
+  validation fails.
+  @since 4.06.0 *)
+
+(** {1 Operations on file names} *)
 
 
 val unlink : string -> unit
-(** Removes the named file *)
+(** Removes the named file.
+
+    If the named file is a directory, raises:
+    {ul
+    {- [EPERM] on POSIX compliant system}
+    {- [EISDIR] on Linux >= 2.1.132}
+    {- [EACCESS] on Windows}}
+*)
 
 val rename : string -> string -> unit
-(** [rename old new] changes the name of a file from [old] to [new]. *)
+(** [rename old new] changes the name of a file from [old] to [new],
+    moving it between directories if needed.  If [new] already
+    exists, its contents will be replaced with those of [old].
+    Depending on the operating system, the metadata (permissions,
+    owner, etc) of [new] can either be preserved or be replaced by
+    those of [old].  *)
 
 val link : string -> string -> unit
 (** [link source dest] creates a hard link named [dest] to the file
    named [source]. *)
 
 
-(** {6 File permissions and ownership} *)
+(** {1 File permissions and ownership} *)
 
 
 type access_permission =
@@ -439,33 +584,44 @@ val chmod : string -> file_perm -> unit
 (** Change the permissions of the named file. *)
 
 val fchmod : file_descr -> file_perm -> unit
-(** Change the permissions of an opened file. *)
+(** Change the permissions of an opened file.
+    On Windows: not implemented. *)
 
 val chown : string -> int -> int -> unit
-(** Change the owner uid and owner gid of the named file. *)
+(** Change the owner uid and owner gid of the named file.
+    On Windows: not implemented (make no sense on a DOS file system). *)
 
 val fchown : file_descr -> int -> int -> unit
-(** Change the owner uid and owner gid of an opened file. *)
+(** Change the owner uid and owner gid of an opened file.
+    On Windows: not implemented (make no sense on a DOS file system).  *)
 
 val umask : int -> int
 (** Set the process's file mode creation mask, and return the previous
-    mask. *)
+    mask.
+    On Windows: not implemented. *)
 
 val access : string -> access_permission list -> unit
-(** Check that the process has the given permissions over the named
-   file. Raise [Unix_error] otherwise. *)
+(** Check that the process has the given permissions over the named file.
+   @raise Unix_error otherwise.
+
+   On Windows, execute permission [X_OK], cannot be tested, it just
+   tests for read permission instead. *)
 
 
-(** {6 Operations on file descriptors} *)
+(** {1 Operations on file descriptors} *)
 
 
-val dup : file_descr -> file_descr
+val dup : ?cloexec:bool -> file_descr -> file_descr
 (** Return a new file descriptor referencing the same file as
-   the given descriptor. *)
+   the given descriptor.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
-val dup2 : file_descr -> file_descr -> unit
+val dup2 : ?cloexec:bool -> file_descr -> file_descr -> unit
 (** [dup2 fd1 fd2] duplicates [fd1] to [fd2], closing [fd2] if already
-   opened. *)
+   opened.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
 val set_nonblock : file_descr -> unit
 (** Set the ``non-blocking'' flag on the given descriptor.
@@ -483,14 +639,55 @@ val set_close_on_exec : file_descr -> unit
 (** Set the ``close-on-exec'' flag on the given descriptor.
    A descriptor with the close-on-exec flag is automatically
    closed when the current process starts another program with
-   one of the [exec] functions. *)
+   one of the [exec], [create_process] and [open_process] functions.
+
+   It is often a security hole to leak file descriptors opened on, say,
+   a private file to an external program: the program, then, gets access
+   to the private file and can do bad things with it.  Hence, it is
+   highly recommended to set all file descriptors ``close-on-exec'',
+   except in the very few cases where a file descriptor actually needs
+   to be transmitted to another program.  
+
+   The best way to set a file descriptor ``close-on-exec'' is to create
+   it in this state.  To this end, the [openfile] function has
+   [O_CLOEXEC] and [O_KEEPEXEC] flags to enforce ``close-on-exec'' mode
+   or ``keep-on-exec'' mode, respectively.  All other operations in
+   the Unix module that create file descriptors have an optional
+   argument [?cloexec:bool] to indicate whether the file descriptor
+   should be created in ``close-on-exec'' mode (by writing
+   [~cloexec:true]) or in ``keep-on-exec'' mode (by writing
+   [~cloexec:false]).  For historical reasons, the default file
+   descriptor creation mode is ``keep-on-exec'', if no [cloexec] optional
+   argument is given.  This is not a safe default, hence it is highly
+   recommended to pass explicit [cloexec] arguments to operations that
+   create file descriptors.
+
+   The [cloexec] optional arguments and the [O_KEEPEXEC] flag were introduced
+   in OCaml 4.05.  Earlier, the common practice was to create file descriptors
+   in the default, ``keep-on-exec'' mode, then call [set_close_on_exec]
+   on those freshly-created file descriptors.  This is not as safe as
+   creating the file descriptor in ``close-on-exec'' mode because, in
+   multithreaded programs, a window of vulnerability exists between the time
+   when the file descriptor is created and the time [set_close_on_exec]
+   completes.  If another thread spawns another program during this window,
+   the descriptor will leak, as it is still in the ``keep-on-exec'' mode.
+
+   Regarding the atomicity guarantees given by [~cloexec:true] or by
+   the use of the [O_CLOEXEC] flag: on all platforms it is guaranteed
+   that a concurrently-executing Caml thread cannot leak the descriptor
+   by starting a new process.  On Linux, this guarantee extends to
+   concurrently-executing C threads.  As of Feb 2017, other operating
+   systems lack the necessary system calls and still expose a window
+   of vulnerability during which a C thread can see the newly-created
+   file descriptor in ``keep-on-exec'' mode.
+ *)
 
 val clear_close_on_exec : file_descr -> unit
 (** Clear the ``close-on-exec'' flag on the given descriptor.
    See {!Unix.set_close_on_exec}.*)
 
 
-(** {6 Directories} *)
+(** {1 Directories} *)
 
 
 val mkdir : string -> file_perm -> unit
@@ -506,7 +703,8 @@ val getcwd : unit -> string
 (** Return the name of the current working directory. *)
 
 val chroot : string -> unit
-(** Change the process root directory. *)
+(** Change the process root directory.
+    On Windows: not implemented. *)
 
 type dir_handle
 (** The type of descriptors over opened directories. *)
@@ -526,19 +724,22 @@ val closedir : dir_handle -> unit
 
 
 
-(** {6 Pipes and redirections} *)
+(** {1 Pipes and redirections} *)
 
 
-val pipe : unit -> file_descr * file_descr
+val pipe : ?cloexec:bool -> unit -> file_descr * file_descr
 (** Create a pipe. The first component of the result is opened
    for reading, that's the exit to the pipe. The second component is
-   opened for writing, that's the entrance to the pipe. *)
+   opened for writing, that's the entrance to the pipe.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
 val mkfifo : string -> file_perm -> unit
-(** Create a named pipe with the given permissions (see {!umask}). *)
+(** Create a named pipe with the given permissions (see {!umask}).
+   On Windows: not implemented. *)
 
 
-(** {6 High-level process and redirection management} *)
+(** {1 High-level process and redirection management} *)
 
 
 val create_process :
@@ -569,7 +770,8 @@ val open_process_in : string -> in_channel
    runs the given command in parallel with the program.
    The standard output of the command is redirected to a pipe,
    which can be read via the returned input channel.
-   The command is interpreted by the shell [/bin/sh] (cf. [system]). *)
+   The command is interpreted by the shell [/bin/sh]
+   (or [cmd.exe] on Windows), cf. [system]. *)
 
 val open_process_out : string -> out_channel
 (** Same as {!Unix.open_process_in}, but redirect the standard input of
@@ -614,18 +816,53 @@ val close_process_full :
    and return its termination status. *)
 
 
-(** {6 Symbolic links} *)
+(** {1 Symbolic links} *)
 
 
-val symlink : string -> string -> unit
-(** [symlink source dest] creates the file [dest] as a symbolic link
-   to the file [source]. *)
+val symlink : ?to_dir:bool -> string -> string -> unit
+(** [symlink ?to_dir source dest] creates the file [dest] as a symbolic link
+   to the file [source]. On Windows, [~to_dir] indicates if the symbolic link
+   points to a directory or a file; if omitted, [symlink] examines [source]
+   using [stat] and picks appropriately, if [source] does not exist then [false]
+   is assumed (for this reason, it is recommended that the [~to_dir] parameter
+   be specified in new code). On Unix, [~to_dir] is ignored.
+
+   Windows symbolic links are available in Windows Vista onwards. There are some
+   important differences between Windows symlinks and their POSIX counterparts.
+
+   Windows symbolic links come in two flavours: directory and regular, which
+   designate whether the symbolic link points to a directory or a file. The type
+   must be correct - a directory symlink which actually points to a file cannot
+   be selected with chdir and a file symlink which actually points to a
+   directory cannot be read or written (note that Cygwin's emulation layer
+   ignores this distinction).
+
+   When symbolic links are created to existing targets, this distinction doesn't
+   matter and [symlink] will automatically create the correct kind of symbolic
+   link. The distinction matters when a symbolic link is created to a
+   non-existent target.
+
+   The other caveat is that by default symbolic links are a privileged
+   operation. Administrators will always need to be running elevated (or with
+   UAC disabled) and by default normal user accounts need to be granted the
+   SeCreateSymbolicLinkPrivilege via Local Security Policy (secpol.msc) or via
+   Active Directory.
+
+   {!has_symlink} can be used to check that a process is able to create symbolic
+   links. *)
+
+val has_symlink : unit -> bool
+(** Returns [true] if the user is able to create symbolic links. On Windows,
+   this indicates that the user not only has the SeCreateSymbolicLinkPrivilege
+   but is also running elevated, if necessary. On other platforms, this is
+   simply indicates that the symlink system call is available.
+   @since 4.03.0 *)
 
 val readlink : string -> string
-(** Read the contents of a link. *)
+(** Read the contents of a symbolic link. *)
 
 
-(** {6 Polling} *)
+(** {1 Polling} *)
 
 
 val select :
@@ -642,8 +879,8 @@ val select :
    and over which an exceptional condition is pending (third
    component). *)
 
-(** {6 Locking} *)
 
+(** {1 Locking} *)
 
 type lock_command =
     F_ULOCK       (** Unlock a region *)
@@ -678,17 +915,24 @@ val lockf : file_descr -> lock_command -> int -> unit
    the specified region.
    Finally, the [F_TEST] command tests whether a write lock can be
    acquired on the specified region, without actually putting a lock.
-   It returns immediately if successful, or fails otherwise. *)
+   It returns immediately if successful, or fails otherwise.
+
+   What happens when a process tries to lock a region of a file that is
+   already locked by the same process depends on the OS.  On POSIX-compliant
+   systems, the second lock operation succeeds and may "promote" the older
+   lock from read lock to write lock.  On Windows, the second lock
+   operation will block or fail.
+*)
 
 
-(** {6 Signals}
+(** {1 Signals}
    Note: installation of signal handlers is performed via
    the functions {!Sys.signal} and {!Sys.set_signal}.
 *)
 
 val kill : int -> int -> unit
 (** [kill pid sig] sends signal number [sig] to the process
-   with id [pid]. Under Windows, only the [Sys.sigkill] signal
+   with id [pid].  On Windows, only the {!Sys.sigkill} signal
    is emulated. *)
 
 type sigprocmask_command =
@@ -704,21 +948,29 @@ val sigprocmask : sigprocmask_command -> int list -> int list
    the set of blocked signals.
    If [cmd] is [SIG_UNBLOCK], the signals in [sigs] are removed
    from the set of blocked signals.
-   [sigprocmask] returns the set of previously blocked signals. *)
+   [sigprocmask] returns the set of previously blocked signals.
+
+   On Windows: not implemented (no inter-process signals on Windows). *)
 
 val sigpending : unit -> int list
-(** Return the set of blocked signals that are currently pending. *)
+(** Return the set of blocked signals that are currently pending.
+
+   On Windows: not implemented (no inter-process signals on Windows). *)
 
 val sigsuspend : int list -> unit
 (** [sigsuspend sigs] atomically sets the blocked signals to [sigs]
    and waits for a non-ignored, non-blocked signal to be delivered.
-   On return, the blocked signals are reset to their initial value. *)
+   On return, the blocked signals are reset to their initial value.
+
+   On Windows: not implemented (no inter-process signals on Windows). *)
 
 val pause : unit -> unit
-(** Wait until a non-ignored, non-blocked signal is delivered. *)
+(** Wait until a non-ignored, non-blocked signal is delivered.
+
+  On Windows: not implemented (no inter-process signals on Windows). *)
 
 
-(** {6 Time functions} *)
+(** {1 Time functions} *)
 
 
 type process_times =
@@ -752,11 +1004,14 @@ val gettimeofday : unit -> float
 
 val gmtime : float -> tm
 (** Convert a time in seconds, as returned by {!Unix.time}, into a date and
-   a time. Assumes UTC (Coordinated Universal Time), also known as GMT. *)
+   a time. Assumes UTC (Coordinated Universal Time), also known as GMT.
+   To perform the inverse conversion, set the TZ environment variable
+   to "UTC", use {!mktime}, and then restore the original value of TZ. *)
 
 val localtime : float -> tm
 (** Convert a time in seconds, as returned by {!Unix.time}, into a date and
-   a time. Assumes the local time zone. *)
+   a time. Assumes the local time zone.
+   The function performing the inverse conversion is {!mktime}. *)
 
 val mktime : tm -> float * tm
 (** Convert a date and time, specified by the [tm] argument, into
@@ -769,19 +1024,29 @@ val mktime : tm -> float * tm
    local time zone. *)
 
 val alarm : int -> int
-(** Schedule a [SIGALRM] signal after the given number of seconds. *)
+(** Schedule a [SIGALRM] signal after the given number of seconds.
+
+   On Windows: not implemented. *)
 
 val sleep : int -> unit
 (** Stop execution for the given number of seconds. *)
 
+val sleepf : float -> unit
+(** Stop execution for the given number of seconds.  Like [sleep],
+    but fractions of seconds are supported.
+
+    @since 4.03.0 *)
+
 val times : unit -> process_times
-(** Return the execution times of the process. *)
+(** Return the execution times of the process.
+   On Windows, it is partially implemented, will not report timings
+   for child processes. *)
 
 val utimes : string -> float -> float -> unit
 (** Set the last access time (second arg) and last modification time
    (third arg) for a file. Times are expressed in seconds from
-   00:00:00 GMT, Jan. 1, 1970.  A time of [0.0] is interpreted as the
-   current time. *)
+   00:00:00 GMT, Jan. 1, 1970.  If both times are [0.0], the access
+   and last modification times are both set to the current time. *)
 
 type interval_timer =
     ITIMER_REAL
@@ -803,7 +1068,9 @@ type interval_timer_status =
 (** The type describing the status of an interval timer *)
 
 val getitimer : interval_timer -> interval_timer_status
-(** Return the current status of the given interval timer. *)
+(** Return the current status of the given interval timer.
+
+   On Windows: not implemented. *)
 
 val setitimer :
   interval_timer -> interval_timer_status -> interval_timer_status
@@ -814,43 +1081,54 @@ val setitimer :
    be used in reloading [it_value] when the timer expires.
    Setting [s.it_value] to zero disables the timer.
    Setting [s.it_interval] to zero causes the timer to be disabled
-   after its next expiration. *)
+   after its next expiration.
+
+   On Windows: not implemented. *)
 
 
-(** {6 User id, group id} *)
+(** {1 User id, group id} *)
 
 
 val getuid : unit -> int
-(** Return the user id of the user executing the process. *)
+(** Return the user id of the user executing the process.
+   On Windows, always return [1]. *)
 
 val geteuid : unit -> int
-(** Return the effective user id under which the process runs. *)
+(** Return the effective user id under which the process runs.
+   On Windows, always return [1]. *)
 
 val setuid : int -> unit
-(** Set the real user id and effective user id for the process. *)
+(** Set the real user id and effective user id for the process.
+   On Windows: not implemented. *)
 
 val getgid : unit -> int
-(** Return the group id of the user executing the process. *)
+(** Return the group id of the user executing the process.
+   On Windows, always return [1]. *)
 
 val getegid : unit -> int
-(** Return the effective group id under which the process runs. *)
+(** Return the effective group id under which the process runs.
+   On Windows, always return [1]. *)
 
 val setgid : int -> unit
-(** Set the real group id and effective group id for the process. *)
+(** Set the real group id and effective group id for the process.
+   On Windows: not implemented. *)
 
 val getgroups : unit -> int array
 (** Return the list of groups to which the user executing the process
-   belongs. *)
+   belongs.
+   On Windows, always return [[|1|]]. *)
 
 val setgroups : int array -> unit
-  (** [setgroups groups] sets the supplementary group IDs for the
-      calling process. Appropriate privileges are required. *)
+(** [setgroups groups] sets the supplementary group IDs for the
+    calling process. Appropriate privileges are required.
+    On Windows: not implemented. *)
 
 val initgroups : string -> int -> unit
-  (** [initgroups user group] initializes the group access list by
-      reading the group database /etc/group and using all groups of
-      which [user] is a member. The additional group [group] is also
-      added to the list. *)
+(** [initgroups user group] initializes the group access list by
+    reading the group database /etc/group and using all groups of
+    which [user] is a member. The additional group [group] is also
+    added to the list.
+    On Windows: not implemented. *)
 
 type passwd_entry =
   { pw_name : string;
@@ -875,23 +1153,31 @@ val getlogin : unit -> string
 (** Return the login name of the user executing the process. *)
 
 val getpwnam : string -> passwd_entry
-(** Find an entry in [passwd] with the given name, or raise
-   [Not_found]. *)
+(** Find an entry in [passwd] with the given name.
+   @raise Not_found if no such entry exist.
+
+   On Windows, always raise [Not_found]. *)
 
 val getgrnam : string -> group_entry
-(** Find an entry in [group] with the given name, or raise
-   [Not_found]. *)
+(** Find an entry in [group] with the given name.
+   @raise Not_found if no such entry exist.
+
+   On Windows, always raise [Not_found]. *)
 
 val getpwuid : int -> passwd_entry
-(** Find an entry in [passwd] with the given user id, or raise
-   [Not_found]. *)
+(** Find an entry in [passwd] with the given user id.
+   @raise Not_found if no such entry exist.
+
+   On Windows, always raise [Not_found]. *)
 
 val getgrgid : int -> group_entry
-(** Find an entry in [group] with the given group id, or raise
-   [Not_found]. *)
+(** Find an entry in [group] with the given group id.
+   @raise Not_found if no such entry exist.
+
+   On Windows, always raise [Not_found]. *)
 
 
-(** {6 Internet addresses} *)
+(** {1 Internet addresses} *)
 
 
 type inet_addr
@@ -902,8 +1188,8 @@ val inet_addr_of_string : string -> inet_addr
     address to its internal representation.  The argument string
     consists of 4 numbers separated by periods ([XXX.YYY.ZZZ.TTT])
     for IPv4 addresses, and up to 8 numbers separated by colons
-    for IPv6 addresses.  Raise [Failure] when given a string that
-    does not match these formats. *)
+    for IPv6 addresses.
+    @raise Failure when given a string that does not match these formats. *)
 
 val string_of_inet_addr : inet_addr -> string
 (** Return the printable representation of the given Internet address.
@@ -925,7 +1211,7 @@ val inet6_addr_loopback : inet_addr
 (** A special IPv6 address representing the host machine ([::1]). *)
 
 
-(** {6 Sockets} *)
+(** {1 Sockets} *)
 
 
 type socket_domain =
@@ -933,7 +1219,8 @@ type socket_domain =
   | PF_INET                     (** Internet domain (IPv4) *)
   | PF_INET6                    (** Internet domain (IPv6) *)
 (** The type of socket domains.  Not all platforms support
-    IPv6 sockets (type [PF_INET6]). *)
+    IPv6 sockets (type [PF_INET6]).  Windows does not support
+    [PF_UNIX]. *)
 
 type socket_type =
     SOCK_STREAM                 (** Stream socket *)
@@ -941,7 +1228,9 @@ type socket_type =
   | SOCK_RAW                    (** Raw socket *)
   | SOCK_SEQPACKET              (** Sequenced packets socket *)
 (** The type of socket kinds, specifying the semantics of
-   communications. *)
+   communications.  [SOCK_SEQPACKET] is included for completeness,
+   but is rarely supported by the OS, and needs system calls that
+   are not available in this library. *)
 
 type sockaddr =
     ADDR_UNIX of string
@@ -952,22 +1241,30 @@ type sockaddr =
    domain; [addr] is the Internet address of the machine, and
    [port] is the port number. *)
 
-val socket : socket_domain -> socket_type -> int -> file_descr
+val socket :
+    ?cloexec:bool -> socket_domain -> socket_type -> int -> file_descr
 (** Create a new socket in the given domain, and with the
    given kind. The third argument is the protocol type; 0 selects
-   the default protocol for that kind of sockets. *)
+   the default protocol for that kind of sockets.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
 val domain_of_sockaddr: sockaddr -> socket_domain
 (** Return the socket domain adequate for the given socket address. *)
 
 val socketpair :
-  socket_domain -> socket_type -> int -> file_descr * file_descr
-(** Create a pair of unnamed sockets, connected together. *)
+     ?cloexec:bool -> socket_domain -> socket_type -> int ->
+                                                 file_descr * file_descr
+(** Create a pair of unnamed sockets, connected together.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
-val accept : file_descr -> file_descr * sockaddr
+val accept : ?cloexec:bool -> file_descr -> file_descr * sockaddr
 (** Accept connections on the given socket. The returned descriptor
    is a socket connected to the client; the returned address is
-   the address of the connecting client. *)
+   the address of the connecting client.
+   See {!set_close_on_exec} for documentation on the [cloexec]
+   optional argument. *)
 
 val bind : file_descr -> sockaddr -> unit
 (** Bind a socket to an address. *)
@@ -1018,7 +1315,8 @@ val send : file_descr -> bytes -> int -> int -> msg_flag list -> int
 
 val send_substring : file_descr -> string -> int -> int -> msg_flag list -> int
 (** Same as [send], but take the data from a string instead of a byte
-    sequence. *)
+    sequence.
+    @since 4.02.0 *)
 
 val sendto :
   file_descr -> bytes -> int -> int -> msg_flag list -> sockaddr -> int
@@ -1027,10 +1325,11 @@ val sendto :
 val sendto_substring :
   file_descr -> string -> int -> int -> msg_flag list -> sockaddr -> int
 (** Same as [sendto], but take the data from a string instead of a
-    byte sequence. *)
+    byte sequence.
+    @since 4.02.0 *)
 
 
-(** {6 Socket options} *)
+(** {1 Socket options} *)
 
 
 type socket_bool_option =
@@ -1109,7 +1408,8 @@ val getsockopt_error : file_descr -> error option
 (** Return the error condition associated with the given socket,
     and clear it. *)
 
-(** {6 High-level network connection functions} *)
+
+(** {1 High-level network connection functions} *)
 
 
 val open_connection : sockaddr -> in_channel * out_channel
@@ -1130,10 +1430,12 @@ val establish_server : (in_channel -> out_channel -> unit) -> sockaddr -> unit
    The function given as first argument is called for each connection
    with two buffered channels connected to the client. A new process
    is created for each connection. The function {!Unix.establish_server}
-   never returns normally. *)
+   never returns normally.
+
+   On Windows, it is not implemented.  Use threads. *)
 
 
-(** {6 Host and protocol databases} *)
+(** {1 Host and protocol databases} *)
 
 
 type host_entry =
@@ -1163,28 +1465,28 @@ val gethostname : unit -> string
 (** Return the name of the local host. *)
 
 val gethostbyname : string -> host_entry
-(** Find an entry in [hosts] with the given name, or raise
-   [Not_found]. *)
+(** Find an entry in [hosts] with the given name.
+    @raise Not_found if no such entry exist. *)
 
 val gethostbyaddr : inet_addr -> host_entry
-(** Find an entry in [hosts] with the given address, or raise
-   [Not_found]. *)
+(** Find an entry in [hosts] with the given address.
+    @raise Not_found if no such entry exist. *)
 
 val getprotobyname : string -> protocol_entry
-(** Find an entry in [protocols] with the given name, or raise
-   [Not_found]. *)
+(** Find an entry in [protocols] with the given name.
+    @raise Not_found if no such entry exist. *)
 
 val getprotobynumber : int -> protocol_entry
-(** Find an entry in [protocols] with the given protocol number,
-   or raise [Not_found]. *)
+(** Find an entry in [protocols] with the given protocol number.
+    @raise Not_found if no such entry exist. *)
 
 val getservbyname : string -> string -> service_entry
-(** Find an entry in [services] with the given name, or raise
-   [Not_found]. *)
+(** Find an entry in [services] with the given name.
+    @raise Not_found if no such entry exist. *)
 
 val getservbyport : int -> string -> service_entry
-(** Find an entry in [services] with the given service number,
-   or raise [Not_found]. *)
+(** Find an entry in [services] with the given service number.
+    @raise Not_found if no such entry exist. *)
 
 type addr_info =
   { ai_family : socket_domain;          (** Socket domain *)
@@ -1228,7 +1530,8 @@ val getaddrinfo:
 
 type name_info =
   { ni_hostname : string;               (** Name or IP address of host *)
-    ni_service : string }               (** Name of service or port number *)
+    ni_service : string;                (** Name of service or port number *)
+  }
 (** Host and service information returned by {!Unix.getnameinfo}. *)
 
 type getnameinfo_option =
@@ -1244,10 +1547,10 @@ val getnameinfo : sockaddr -> getnameinfo_option list -> name_info
 (** [getnameinfo addr opts] returns the host name and service name
     corresponding to the socket address [addr].  [opts] is a possibly
     empty list of options that governs how these names are obtained.
-    Raise [Not_found] if an error occurs. *)
+    @raise Not_found if an error occurs. *)
 
 
-(** {6 Terminal interface} *)
+(** {1 Terminal interface} *)
 
 
 (** The following functions implement the POSIX standard terminal
@@ -1306,7 +1609,8 @@ type terminal_io =
 
 val tcgetattr : file_descr -> terminal_io
 (** Return the status of the terminal referred to by the given
-   file descriptor. *)
+   file descriptor.
+   On Windows, not implemented. *)
 
 type setattr_when =
     TCSANOW
@@ -1321,16 +1625,22 @@ val tcsetattr : file_descr -> setattr_when -> terminal_io -> unit
    or after flushing all input that has been received but not
    read ([TCSAFLUSH]). [TCSADRAIN] is recommended when changing
    the output parameters; [TCSAFLUSH], when changing the input
-   parameters. *)
+   parameters.
+
+   On Windows, not implemented. *)
 
 val tcsendbreak : file_descr -> int -> unit
 (** Send a break condition on the given file descriptor.
    The second argument is the duration of the break, in 0.1s units;
-   0 means standard duration (0.25s). *)
+   0 means standard duration (0.25s).
+
+   On Windows, not implemented. *)
 
 val tcdrain : file_descr -> unit
 (** Waits until all output written on the given file descriptor
-   has been transmitted. *)
+   has been transmitted.
+
+   On Windows, not implemented. *)
 
 type flush_queue =
     TCIFLUSH
@@ -1342,7 +1652,9 @@ val tcflush : file_descr -> flush_queue -> unit
    transmitted, or data received but not yet read, depending on the
    second argument: [TCIFLUSH] flushes data received but not read,
    [TCOFLUSH] flushes data written but not transmitted, and
-   [TCIOFLUSH] flushes both. *)
+   [TCIOFLUSH] flushes both.
+
+   On Windows, not implemented. *)
 
 type flow_action =
     TCOOFF
@@ -1355,8 +1667,12 @@ val tcflow : file_descr -> flow_action -> unit
    the given file descriptor, depending on the second argument:
    [TCOOFF] suspends output, [TCOON] restarts output,
    [TCIOFF] transmits a STOP character to suspend input,
-   and [TCION] transmits a START character to restart input. *)
+   and [TCION] transmits a START character to restart input.
+
+   On Windows, not implemented. *)
 
 val setsid : unit -> int
 (** Put the calling process in a new session and detach it from
-   its controlling terminal. *)
+   its controlling terminal.
+
+   On Windows, not implemented. *)

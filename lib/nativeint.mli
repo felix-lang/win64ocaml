@@ -1,15 +1,17 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         *)
-(*                                                                     *)
-(*  Copyright 1996 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../LICENSE.     *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*                                                                        *)
+(*   Copyright 1996 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
 (** Processor-native integers.
 
@@ -83,7 +85,7 @@ val max_int : nativeint
    or 2{^63} - 1 on a 64-bit platform. *)
 
 val min_int : nativeint
-(** The greatest representable native integer,
+(** The smallest representable native integer,
    either -2{^31} on a 32-bit platform,
    or -2{^63} on a 64-bit platform. *)
 
@@ -97,7 +99,7 @@ external logxor : nativeint -> nativeint -> nativeint = "%nativeint_xor"
 (** Bitwise logical exclusive or. *)
 
 val lognot : nativeint -> nativeint
-(** Bitwise logical negation *)
+(** Bitwise logical negation. *)
 
 external shift_left : nativeint -> int -> nativeint = "%nativeint_lsl"
 (** [Nativeint.shift_left x y] shifts [x] to the left by [y] bits.
@@ -129,14 +131,18 @@ external to_int : nativeint -> int = "%nativeint_to_int"
    integer (type [int]).  The high-order bit is lost during
    the conversion. *)
 
-external of_float : float -> nativeint = "caml_nativeint_of_float"
+external of_float : float -> nativeint
+  = "caml_nativeint_of_float" "caml_nativeint_of_float_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Convert the given floating-point number to a native integer,
    discarding the fractional part (truncate towards 0).
    The result of the conversion is undefined if, after truncation,
    the number is outside the range
    \[{!Nativeint.min_int}, {!Nativeint.max_int}\]. *)
 
-external to_float : nativeint -> float = "caml_nativeint_to_float"
+external to_float : nativeint -> float
+  = "caml_nativeint_to_float" "caml_nativeint_to_float_unboxed"
+  [@@unboxed] [@@noalloc]
 (** Convert the given native integer to a floating-point number. *)
 
 external of_int32 : int32 -> nativeint = "%nativeint_of_int32"
@@ -152,12 +158,22 @@ external to_int32 : nativeint -> int32 = "%nativeint_to_int32"
 
 external of_string : string -> nativeint = "caml_nativeint_of_string"
 (** Convert the given string to a native integer.
-   The string is read in decimal (by default) or in hexadecimal,
-   octal or binary if the string begins with [0x], [0o] or [0b]
-   respectively.
-   Raise [Failure "int_of_string"] if the given string is not
+   The string is read in decimal (by default, or if the string 
+   begins with [0u]) or in hexadecimal, octal or binary if the
+   string begins with [0x], [0o] or [0b] respectively.
+
+   The [0u] prefix reads the input as an unsigned integer in the range
+   [[0, 2*Nativeint.max_int+1]].  If the input exceeds {!Nativeint.max_int}
+   it is converted to the signed integer
+   [Int64.min_int + input - Nativeint.max_int - 1].
+
+   Raise [Failure "Nativeint.of_string"] if the given string is not
    a valid representation of an integer, or if the integer represented
    exceeds the range of integers representable in type [nativeint]. *)
+
+val of_string_opt: string -> nativeint option
+(** Same as [of_string], but return [None] instead of raising.
+    @since 4.05 *)
 
 val to_string : nativeint -> string
 (** Return the string representation of its argument, in decimal. *)
@@ -171,9 +187,13 @@ val compare: t -> t -> int
     allows the module [Nativeint] to be passed as argument to the functors
     {!Set.Make} and {!Map.Make}. *)
 
+val equal: t -> t -> bool
+(** The equal function for native ints.
+    @since 4.03.0 *)
+
 (**/**)
 
-(** {6 Deprecated functions} *)
+(** {1 Deprecated functions} *)
 
 external format : string -> nativeint -> string = "caml_nativeint_format"
 (** [Nativeint.format fmt n] return the string representation of the

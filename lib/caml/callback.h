@@ -1,15 +1,17 @@
-/***********************************************************************/
-/*                                                                     */
-/*                                OCaml                                */
-/*                                                                     */
-/*            Xavier Leroy, projet Cristal, INRIA Rocquencourt         */
-/*                                                                     */
-/*  Copyright 1996 Institut National de Recherche en Informatique et   */
-/*  en Automatique.  All rights reserved.  This file is distributed    */
-/*  under the terms of the GNU Library General Public License, with    */
-/*  the special exception on linking described in file ../LICENSE.     */
-/*                                                                     */
-/***********************************************************************/
+/**************************************************************************/
+/*                                                                        */
+/*                                 OCaml                                  */
+/*                                                                        */
+/*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           */
+/*                                                                        */
+/*   Copyright 1996 Institut National de Recherche en Informatique et     */
+/*     en Automatique.                                                    */
+/*                                                                        */
+/*   All rights reserved.  This file is distributed under the terms of    */
+/*   the GNU Lesser General Public License version 2.1, with the          */
+/*   special exception on linking described in the file LICENSE.          */
+/*                                                                        */
+/**************************************************************************/
 
 /* Callbacks from C to OCaml */
 
@@ -45,8 +47,12 @@ CAMLextern value * caml_named_value (char const * name);
 typedef void (*caml_named_action) (value*, char *);
 CAMLextern void caml_iterate_named_values(caml_named_action f);
 
-CAMLextern void caml_main (char ** argv);
-CAMLextern void caml_startup (char ** argv);
+CAMLextern void caml_main (char_os ** argv);
+CAMLextern void caml_startup (char_os ** argv);
+CAMLextern value caml_startup_exn (char_os ** argv);
+CAMLextern void caml_startup_pooled (char_os ** argv);
+CAMLextern value caml_startup_pooled_exn (char_os ** argv);
+CAMLextern void caml_shutdown (void);
 
 CAMLextern int caml_callback_depth;
 

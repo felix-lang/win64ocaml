@@ -1,15 +1,17 @@
-(***********************************************************************)
-(*                                                                     *)
-(*                                OCaml                                *)
-(*                                                                     *)
-(*   Pierre Weis and Xavier Leroy, projet Cristal, INRIA Rocquencourt  *)
-(*                                                                     *)
-(*  Copyright 1999 Institut National de Recherche en Informatique et   *)
-(*  en Automatique.  All rights reserved.  This file is distributed    *)
-(*  under the terms of the GNU Library General Public License, with    *)
-(*  the special exception on linking described in file ../LICENSE.     *)
-(*                                                                     *)
-(***********************************************************************)
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*    Pierre Weis and Xavier Leroy, projet Cristal, INRIA Rocquencourt    *)
+(*                                                                        *)
+(*   Copyright 1999 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
 
 (* Extensible buffers *)
 
@@ -32,21 +34,21 @@ let sub b ofs len =
   if ofs < 0 || len < 0 || ofs > b.position - len
   then invalid_arg "Buffer.sub"
   else Bytes.sub_string b.buffer ofs len
-;;
+
 
 let blit src srcoff dst dstoff len =
   if len < 0 || srcoff < 0 || srcoff > src.position - len
              || dstoff < 0 || dstoff > (Bytes.length dst) - len
   then invalid_arg "Buffer.blit"
   else
-    Bytes.blit src.buffer srcoff dst dstoff len
-;;
+    Bytes.unsafe_blit src.buffer srcoff dst dstoff len
+
 
 let nth b ofs =
   if ofs < 0 || ofs >= b.position then
    invalid_arg "Buffer.nth"
   else Bytes.unsafe_get b.buffer ofs
-;;
+
 
 let length b = b.position
 
@@ -66,6 +68,8 @@ let resize b more =
     else failwith "Buffer.add: cannot grow buffer"
   end;
   let new_buffer = Bytes.create !new_len in
+  (* PR#6148: let's keep using [blit] rather than [unsafe_blit] in
+     this tricky function that is slow anyway. *)
   Bytes.blit b.buffer 0 new_buffer 0 b.position;
   b.buffer <- new_buffer;
   b.length <- !new_len
@@ -76,8 +80,86 @@ let add_char b c =
   Bytes.unsafe_set b.buffer pos c;
   b.position <- pos + 1
 
+ let add_utf_8_uchar b u = match Uchar.to_int u with
+ | u when u < 0 -> assert false
+ | u when u <= 0x007F ->
+     add_char b (Char.unsafe_chr u)
+ | u when u <= 0x07FF ->
+     let pos = b.position in
+     if pos + 2 > b.length then resize b 2;
+     Bytes.unsafe_set b.buffer (pos    )
+       (Char.unsafe_chr (0xC0 lor (u lsr 6)));
+     Bytes.unsafe_set b.buffer (pos + 1)
+       (Char.unsafe_chr (0x80 lor (u land 0x3F)));
+     b.position <- pos + 2
+ | u when u <= 0xFFFF ->
+     let pos = b.position in
+     if pos + 3 > b.length then resize b 3;
+     Bytes.unsafe_set b.buffer (pos    )
+       (Char.unsafe_chr (0xE0 lor (u lsr 12)));
+     Bytes.unsafe_set b.buffer (pos + 1)
+       (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
+     Bytes.unsafe_set b.buffer (pos + 2)
+       (Char.unsafe_chr (0x80 lor (u land 0x3F)));
+     b.position <- pos + 3
+ | u when u <= 0x10FFFF ->
+     let pos = b.position in
+     if pos + 4 > b.length then resize b 4;
+     Bytes.unsafe_set b.buffer (pos    )
+       (Char.unsafe_chr (0xF0 lor (u lsr 18)));
+     Bytes.unsafe_set b.buffer (pos + 1)
+       (Char.unsafe_chr (0x80 lor ((u lsr 12) land 0x3F)));
+     Bytes.unsafe_set b.buffer (pos + 2)
+       (Char.unsafe_chr (0x80 lor ((u lsr 6) land 0x3F)));
+     Bytes.unsafe_set b.buffer (pos + 3)
+       (Char.unsafe_chr (0x80 lor (u land 0x3F)));
+     b.position <- pos + 4
+ | _ -> assert false
+
+ let add_utf_16be_uchar b u = match Uchar.to_int u with
+ | u when u < 0 -> assert false
+ | u when u <= 0xFFFF ->
+     let pos = b.position in
+     if pos + 2 > b.length then resize b 2;
+     Bytes.unsafe_set b.buffer (pos    ) (Char.unsafe_chr (u lsr 8));
+     Bytes.unsafe_set b.buffer (pos + 1) (Char.unsafe_chr (u land 0xFF));
+     b.position <- pos + 2
+ | u when u <= 0x10FFFF ->
+     let u' = u - 0x10000 in
+     let hi = 0xD800 lor (u' lsr 10) in
+     let lo = 0xDC00 lor (u' land 0x3FF) in
+     let pos = b.position in
+     if pos + 4 > b.length then resize b 4;
+     Bytes.unsafe_set b.buffer (pos    ) (Char.unsafe_chr (hi lsr 8));
+     Bytes.unsafe_set b.buffer (pos + 1) (Char.unsafe_chr (hi land 0xFF));
+     Bytes.unsafe_set b.buffer (pos + 2) (Char.unsafe_chr (lo lsr 8));
+     Bytes.unsafe_set b.buffer (pos + 3) (Char.unsafe_chr (lo land 0xFF));
+     b.position <- pos + 4
+ | _ -> assert false
+
+ let add_utf_16le_uchar b u = match Uchar.to_int u with
+ | u when u < 0 -> assert false
+ | u when u <= 0xFFFF ->
+     let pos = b.position in
+     if pos + 2 > b.length then resize b 2;
+     Bytes.unsafe_set b.buffer (pos    ) (Char.unsafe_chr (u land 0xFF));
+     Bytes.unsafe_set b.buffer (pos + 1) (Char.unsafe_chr (u lsr 8));
+     b.position <- pos + 2
+ | u when u <= 0x10FFFF ->
+     let u' = u - 0x10000 in
+     let hi = 0xD800 lor (u' lsr 10) in
+     let lo = 0xDC00 lor (u' land 0x3FF) in
+     let pos = b.position in
+     if pos + 4 > b.length then resize b 4;
+     Bytes.unsafe_set b.buffer (pos    ) (Char.unsafe_chr (hi land 0xFF));
+     Bytes.unsafe_set b.buffer (pos + 1) (Char.unsafe_chr (hi lsr 8));
+     Bytes.unsafe_set b.buffer (pos + 2) (Char.unsafe_chr (lo land 0xFF));
+     Bytes.unsafe_set b.buffer (pos + 3) (Char.unsafe_chr (lo lsr 8));
+     b.position <- pos + 4
+ | _ -> assert false
+
 let add_substring b s offset len =
-  if offset < 0 || len < 0 || offset + len > String.length s
+  if offset < 0 || len < 0 || offset > String.length s - len
   then invalid_arg "Buffer.add_substring/add_subbytes";
   let new_position = b.position + len in
   if new_position > b.length then resize b len;
@@ -99,12 +181,20 @@ let add_bytes b s = add_string b (Bytes.unsafe_to_string s)
 let add_buffer b bs =
   add_subbytes b bs.buffer 0 bs.position
 
+(* read up to [len] bytes from [ic] into [b]. *)
+let rec add_channel_rec b ic len =
+  if len > 0 then (
+    let n = input ic b.buffer b.position len in
+    b.position <- b.position + n;
+    if n = 0 then raise End_of_file
+    else add_channel_rec b ic (len-n)   (* n <= len *)
+  )
+
 let add_channel b ic len =
   if len < 0 || len > Sys.max_string_length then   (* PR#5004 *)
     invalid_arg "Buffer.add_channel";
   if b.position + len > b.length then resize b len;
-  really_input ic b.buffer b.position len;
-  b.position <- b.position + len
+  add_channel_rec b ic len
 
 let output_buffer oc b =
   output oc b.buffer 0 b.position
@@ -112,7 +202,7 @@ let output_buffer oc b =
 let closing = function
   | '(' -> ')'
   | '{' -> '}'
-  | _ -> assert false;;
+  | _ -> assert false
 
 (* opening and closing: open and close characters, typically ( and )
    k: balance of opening and closing chars
@@ -125,7 +215,7 @@ let advance_to_closing opening closing k s start =
     if s.[i] = closing then
       if k = 0 then i else advance (k - 1) (i + 1) lim
     else advance k (i + 1) lim in
-  advance k start (String.length s);;
+  advance k start (String.length s)
 
 let advance_to_non_alpha s start =
   let rec advance i lim =
@@ -133,7 +223,7 @@ let advance_to_non_alpha s start =
     match s.[i] with
     | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> advance (i + 1) lim
     | _ -> i in
-  advance start (String.length s);;
+  advance start (String.length s)
 
 (* We are just at the beginning of an ident in s, starting at start. *)
 let find_ident s start lim =
@@ -147,7 +237,7 @@ let find_ident s start lim =
   (* Regular ident *)
   | _ ->
      let stop = advance_to_non_alpha s (start + 1) in
-     String.sub s start (stop - start), stop;;
+     String.sub s start (stop - start), stop
 
 (* Substitute $ident, $(ident), or ${ident} in s,
     according to the function mapping f. *)
@@ -175,4 +265,10 @@ let add_substitute b f s =
          subst current (i + 1)
     end else
     if previous = '\\' then add_char b previous in
-  subst ' ' 0;;
+  subst ' ' 0
+
+let truncate b len =
+    if len < 0 || len > length b then
+      invalid_arg "Buffer.truncate"
+    else
+      b.position <- len

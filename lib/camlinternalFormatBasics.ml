@@ -1,3 +1,18 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCaml                                  *)
+(*                                                                        *)
+(*                          Benoit Vaugon, ENSTA                          *)
+(*                                                                        *)
+(*   Copyright 2014 Institut National de Recherche en Informatique et     *)
+(*     en Automatique.                                                    *)
+(*                                                                        *)
+(*   All rights reserved.  This file is distributed under the terms of    *)
+(*   the GNU Lesser General Public License version 2.1, with the          *)
+(*   special exception on linking described in the file LICENSE.          *)
+(*                                                                        *)
+(**************************************************************************)
+
 (* Padding position. *)
 type padty =
   | Left   (* Text is left justified ('-' option).               *)
@@ -23,6 +38,8 @@ type float_conv =
   | Float_g | Float_pg | Float_sg  (*  %g | %+g | % g  *)
   | Float_G | Float_pG | Float_sG  (*  %G | %+G | % G  *)
   | Float_F                        (*  %F              *)
+  | Float_h | Float_ph | Float_sh  (*  %h | %+h | % h  *)
+  | Float_H | Float_pH | Float_sH  (*  %H | %+H | % H  *)
 
 (***)
 
@@ -90,11 +107,11 @@ position in the format tail (('u, .., 'f) fmt). This means that the
 type of the expected format parameter depends of where the %(...%)
 are in the format string:
 
-  # Printf.printf "%(%)";;
+  # Printf.printf "%(%)"
   - : (unit, out_channel, unit, '_a, '_a, unit)
       CamlinternalFormatBasics.format6 -> unit
   = <fun>
-  # Printf.printf "%(%)%d";;
+  # Printf.printf "%(%)%d"
   - : (int -> unit, out_channel, unit, '_a, '_a, int -> unit)
       CamlinternalFormatBasics.format6 -> int -> unit
   = <fun>
@@ -135,7 +152,7 @@ parameter is as follows:
     (char -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
      char -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
 
-In the general case, the term structure of fmtty_rel is (almost¹)
+In the general case, the term structure of fmtty_rel is (almost[1])
 isomorphic to the fmtty of the previous implementation: every
 constructor is re-read with a binary, relational type, instead of the
 previous unary typing. fmtty can then be re-defined as the diagonal of
@@ -169,10 +186,10 @@ to transpose between related format types.
       'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
   -> ('a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmt
 
-NOTE ¹: the typing of Format_subst_ty requires not one format type, but
+NOTE [1]: the typing of Format_subst_ty requires not one format type, but
 two, one to establish the link between the format argument and the
 first six parameters, and the other for the link between the format
-argumant and the last six parameters.
+argument and the last six parameters.
 
 | Format_subst_ty :                                         (* %(...%) *)
     ('g, 'h, 'i, 'j, 'k, 'l,
@@ -197,7 +214,7 @@ function that proves that the relation is transitive
   -> ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
       'a3, 'b3, 'c3, 'd3, 'e3, 'f3) fmtty_rel
 
-does assume that the two input have exactly the same term structure
+does assume that the two inputs have exactly the same term structure
 (and is only every used for argument witnesses of the
 Format_subst_ty constructor).
 *)
@@ -215,7 +232,7 @@ type block_type =
                  when it leads to a new indentation of the current line *)
   | Pp_fits   (* Internal usage: when a block fits on a single line *)
 
-(* Formatting element used by the Format pretty-printter. *)
+(* Formatting element used by the Format pretty-printer. *)
 type formatting_lit =
   | Close_box                                           (* @]   *)
   | Close_tag                                           (* @}   *)
@@ -228,7 +245,7 @@ type formatting_lit =
   | Escaped_percent                                     (* @%%  *)
   | Scan_indic of char                                  (* @X   *)
 
-(* Formatting element used by the Format pretty-printter. *)
+(* Formatting element used by the Format pretty-printer. *)
 type ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen =
   | Open_tag : ('a, 'b, 'c, 'd, 'e, 'f) format6 ->      (* @{   *)
     ('a, 'b, 'c, 'd, 'e, 'f) formatting_gen
@@ -290,7 +307,8 @@ and ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
       ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
       (('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
-       ('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
+       ('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2)
+           fmtty_rel
   | Format_subst_ty :                                         (* %(...%) *)
       ('g, 'h, 'i, 'j, 'k, 'l,
        'g1, 'b1, 'c1, 'j1, 'd1, 'a1) fmtty_rel *
@@ -299,7 +317,8 @@ and ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
       ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
       (('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'g1, 'b1, 'c1, 'j1, 'e1, 'f1,
-       ('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'g2, 'b2, 'c2, 'j2, 'e2, 'f2) fmtty_rel
+       ('g, 'h, 'i, 'j, 'k, 'l) format6 -> 'g2, 'b2, 'c2, 'j2, 'e2, 'f2)
+           fmtty_rel
 
   (* Printf and Format specific constructors. *)
   | Alpha_ty :                                                (* %a  *)
@@ -312,7 +331,7 @@ and ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
       (('b1 -> 'c1) -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        ('b2 -> 'c2) -> 'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel
-  | Any_ty :                                                  (* Used for custom formats *)
+  | Any_ty :                                    (* Used for custom formats *)
       ('a1, 'b1, 'c1, 'd1, 'e1, 'f1,
        'a2, 'b2, 'c2, 'd2, 'e2, 'f2) fmtty_rel ->
       ('x -> 'a1, 'b1, 'c1, 'd1, 'e1, 'f1,
@@ -371,8 +390,8 @@ and ('a, 'b, 'c, 'd, 'e, 'f) fmt =
       ('a, 'b, 'c, 'd, 'e, 'f) fmt ->
         ('x, 'b, 'c, 'd, 'e, 'f) fmt
   | Bool :                                                   (* %[bB] *)
-      ('a, 'b, 'c, 'd, 'e, 'f) fmt ->
-        (bool -> 'a, 'b, 'c, 'd, 'e, 'f) fmt
+      ('x, bool -> 'a) padding * ('a, 'b, 'c, 'd, 'e, 'f) fmt ->
+        ('x, 'b, 'c, 'd, 'e, 'f) fmt
   | Flush :                                                  (* %! *)
       ('a, 'b, 'c, 'd, 'e, 'f) fmt ->
         ('a, 'b, 'c, 'd, 'e, 'f) fmt
@@ -433,7 +452,7 @@ and ('a, 'b, 'c, 'd, 'e, 'f) fmt =
      We include a type Custom of "custom converters", where an
      arbitrary function can be used to convert one or more
      arguments. There is no syntax for custom converters, it is only
-     inteded for custom processors that wish to rely on the
+     intended for custom processors that wish to rely on the
      stdlib-defined format GADTs.
 
      For instance a pre-processor could choose to interpret strings
@@ -480,7 +499,7 @@ and ('a, 'b, 'c, 'd, 'e, 'f) ignored =
   | Ignored_float :                                          (* %_f *)
       pad_option * prec_option -> ('a, 'b, 'c, 'd, 'd, 'a) ignored
   | Ignored_bool :                                           (* %_B *)
-      ('a, 'b, 'c, 'd, 'd, 'a) ignored
+      pad_option -> ('a, 'b, 'c, 'd, 'd, 'a) ignored
   | Ignored_format_arg :                                     (* %_{...%} *)
       pad_option * ('g, 'h, 'i, 'j, 'k, 'l) fmtty ->
         ('a, 'b, 'c, 'd, 'd, 'a) ignored
@@ -521,7 +540,7 @@ let rec erase_rel : type a b c d e f g h i j k l .
     Bool_ty (erase_rel rest)
   | Format_arg_ty (ty, rest) ->
     Format_arg_ty (ty, erase_rel rest)
-  | Format_subst_ty (ty1, ty2, rest) ->
+  | Format_subst_ty (ty1, _ty2, rest) ->
     Format_subst_ty (ty1, ty1, erase_rel rest)
   | Alpha_ty rest ->
     Alpha_ty (erase_rel rest)
@@ -623,8 +642,8 @@ fun fmt1 fmt2 -> match fmt1 with
     Char (concat_fmt rest fmt2)
   | Caml_char rest ->
     Caml_char (concat_fmt rest fmt2)
-  | Bool rest ->
-    Bool (concat_fmt rest fmt2)
+  | Bool (pad, rest) ->
+    Bool (pad, concat_fmt rest fmt2)
   | Alpha rest ->
     Alpha (concat_fmt rest fmt2)
   | Theta rest ->
