@@ -1,9 +1,10 @@
 # win64 ocaml binary
-Felix now requires Ocaml 4.06. 
+OCaml 4.11.1 MSVC build for Win64, intended to be used for building Felix.
 
-To fetch the binary on Windows I created a workspace and opened a CMD.EXE console and typed:
-```
-git clone -b ocaml-4.06.0 --depth 1 https://github.com/felix-lang/win64ocaml.git
-```
+Borrowed from [opam-repository-mingw](https://github.com/fdopen/opam-repository-mingw).
 
-DO NOT USE THE MASTER BRANCH
+To get the binaries, use the following command:
+
+```
+git clone -b ocaml-4.11.1 --depth 1 https://github.com/felix-lang/win64ocaml.git
+```
