@@ -1,5 +1,5 @@
 # win64 ocaml binary
-Felix now requires Ocaml 4.06. 
+Felix now requires Ocaml 4.07 (due to the fact that it uses the `Stdlib` module). 
 
 To fetch the binary on Windows I created a workspace and opened a CMD.EXE console and typed:
 ```
